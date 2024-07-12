@@ -21,30 +21,71 @@ import androidx.core.content.ContextCompat
 import com.example.coordtest.ui.theme.CoordTestTheme
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.panasonic.toughpad.android.api.ToughpadApi
+import com.panasonic.toughpad.android.api.ToughpadApiListener
+import com.panasonic.toughpad.android.api.barcode.BarcodeData
+import com.panasonic.toughpad.android.api.barcode.BarcodeListener
+import com.panasonic.toughpad.android.api.barcode.BarcodeReader
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), ToughpadApiListener, BarcodeListener {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var barcodeReader: BarcodeReader? = null
+    private var barcodeData by mutableStateOf("No barcode scanned")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
+        ToughpadApi.initialize(this, this)
+
         setContent {
             CoordTestTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    LocationScreen(fusedLocationClient)
+                    MainScreen(fusedLocationClient, barcodeData) {
+                        startBarcodeScan()
+                    }
                 }
             }
         }
     }
+
+    private fun startBarcodeScan() {
+        barcodeReader?.let {
+            it.addBarcodeListener(this)
+            it.pressSoftwareTrigger()
+        }
+    }
+
+    override fun onApiConnected() {
+        val readers = BarcodeReader.getBarcodeReaders()
+        if (readers.isNotEmpty()) {
+            barcodeReader = readers[0]
+        }
+    }
+
+    override fun onApiDisconnected() {
+        barcodeReader?.removeBarcodeListener(this)
+    }
+
+    override fun onRead(data: BarcodeData?) {
+        barcodeData = data?.text ?: "Failed to read barcode"
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        ToughpadApi.destroy()
+    }
 }
 
 @Composable
-fun LocationScreen(fusedLocationClient: FusedLocationProviderClient) {
+fun MainScreen(
+    fusedLocationClient: FusedLocationProviderClient,
+    barcodeData: String,
+    onScanBarcode: () -> Unit
+) {
     var locationText by remember { mutableStateOf("Coordinates will be shown here") }
     val context = LocalContext.current
     val requestPermissionLauncher = rememberLauncherForActivityResult(
@@ -80,11 +121,9 @@ fun LocationScreen(fusedLocationClient: FusedLocationProviderClient) {
                     context as ComponentActivity,
                     Manifest.permission.ACCESS_FINE_LOCATION
                 ) -> {
-                    // Show rationale dialog and request permission
                     requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                 }
                 else -> {
-                    // Directly request for permission
                     requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                 }
             }
@@ -93,6 +132,12 @@ fun LocationScreen(fusedLocationClient: FusedLocationProviderClient) {
         }
         Spacer(modifier = Modifier.height(20.dp))
         Text(text = locationText)
+        Spacer(modifier = Modifier.height(20.dp))
+        Button(onClick = onScanBarcode) {
+            Text(text = "Scan Barcode")
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(text = barcodeData)
     }
 }
 
@@ -125,13 +170,12 @@ private fun getLastKnownLocation(
 @Composable
 fun DefaultPreview() {
     CoordTestTheme {
-        // Preview doesn't require FusedLocationProviderClient
-        LocationScreenPreview()
+        MainScreenPreview()
     }
 }
 
 @Composable
-fun LocationScreenPreview() {
+fun MainScreenPreview() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -142,5 +186,11 @@ fun LocationScreenPreview() {
         }
         Spacer(modifier = Modifier.height(20.dp))
         Text(text = "Coordinates will be shown here")
+        Spacer(modifier = Modifier.height(20.dp))
+        Button(onClick = {}) {
+            Text(text = "Scan Barcode")
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(text = "No barcode scanned")
     }
 }
