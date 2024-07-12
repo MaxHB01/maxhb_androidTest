@@ -27,7 +27,7 @@ import com.panasonic.toughpad.android.api.barcode.BarcodeData
 import com.panasonic.toughpad.android.api.barcode.BarcodeListener
 import com.panasonic.toughpad.android.api.barcode.BarcodeReader
 
-class MainActivity : ComponentActivity(), ToughpadApiListener, BarcodeListener {
+abstract class MainActivity : ComponentActivity(), ToughpadApiListener, BarcodeListener {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var barcodeReader: BarcodeReader? = null
     private var barcodeData by mutableStateOf("No barcode scanned")
